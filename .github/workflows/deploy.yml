@@ -1,0 +1,56 @@
+# Save as: .github/workflows/deploy.yml
+name: Deploy site to S3 + CloudFront
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+# Least privilege for the GITHUB_TOKEN.
+# id-token: write lets the job request an OIDC token to exchange for AWS creds.
+permissions:
+  id-token: write
+  contents: read
+
+# Never run two deploys at once; queue instead of cancelling mid-sync.
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      AWS_REGION: ap-south-1   # change if your bucket is in another region
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false   # job never pushes back to git
+
+      - name: Configure AWS credentials (OIDC, no stored keys)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: gha-${{ github.run_id }}   # traceable in CloudTrail
+
+      - name: Sync site/ to S3
+        env:
+          S3_BUCKET: ${{ vars.S3_BUCKET }}
+        run: aws s3 sync site/ "s3://${S3_BUCKET}" --delete
+
+      - name: Invalidate CloudFront cache
+        env:
+          CF_DISTRIBUTION_ID: ${{ vars.CF_DISTRIBUTION_ID }}
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${CF_DISTRIBUTION_ID}" \
+            --paths "/*" \
+            --query 'Invalidation.{Id:Id,Status:Status}' \
+            --output table
