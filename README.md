@@ -76,9 +76,11 @@ Built as hands-on practice for the AWS Certified Solutions Architect – Associa
 
 ```text
 .
-├── .github/workflows/deploy.yml   # OIDC deploy pipeline
+── .github/workflows/deploy.yml   # OIDC deploy pipeline
+├── docs
+|   ├──architecture.svg           # architecture diagram
 ├── site/
-│   ├── index.html                 # learning-log page
+│   ├── index.html ├                # learning-log page
 │   └── error.html                 # custom 403/404 page
 └── README.md
 ```
